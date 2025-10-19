@@ -277,7 +277,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 URL = "https://kalimatimarket.gov.np/price"
 OUT_DIR = "data"
-OUT_FILE = os.path.join(OUT_DIR, "price_list.csv")
+OUT_FILE = os.path.join(OUT_DIR, "veg_price_list.csv")
 START_DATE_STR = "01/01/2023"  # mm/dd/YYYY  ← base start date
 
 
