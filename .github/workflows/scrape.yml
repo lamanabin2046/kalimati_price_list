@@ -2,8 +2,8 @@ name: Scrape Kalimati Prices
 
 on:
   schedule:
-    # Daily 07:00 Nepal time (UTC+5:45) = 01:15 UTC
-    - cron: "15 1 * * *"
+    # Daily 00:02 Bangkok (UTC+7) == 17:02 UTC previous day
+    - cron: "2 17 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Show Chrome path
         run: |
-            echo "Chrome path: $CHROME_PATH"
+          echo "Chrome path: $CHROME_PATH"
 
       - name: Install deps
         run: |
