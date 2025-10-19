@@ -1,0 +1,61 @@
+name: Scrape Kalimati Prices
+
+on:
+  schedule:
+    # Daily 07:00 Nepal time (UTC+5:45) = 01:15 UTC
+    - cron: "15 1 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Google Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Show Chrome path
+        run: |
+            echo "Chrome path: $CHROME_PATH"
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          CHROME_PATH: ${{ env.CHROME_PATH }}
+        run: |
+          python scraper.py
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name "lamanabin2046"
+          git config user.email "lamanabin2046@gmail.com"
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add data/price_list.csv
+            git commit -m "Update Kalimati price data [skip ci]"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Upload CSV as artifact (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kalimati-price-data
+          path: data/price_list.csv

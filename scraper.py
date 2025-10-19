@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -50,10 +50,20 @@ def date_already_recorded(csv_path: str, date_str: str) -> bool:
 
 def setup_driver():
     chrome_opts = Options()
+    # If the GitHub Action provides a Chrome binary, use it
+    chrome_path = os.environ.get("CHROME_PATH")
+    if chrome_path and os.path.exists(chrome_path):
+        chrome_opts.binary_location = chrome_path
+
     chrome_opts.add_argument("--headless=new")
     chrome_opts.add_argument("--no-sandbox")
     chrome_opts.add_argument("--disable-dev-shm-usage")
     chrome_opts.add_argument("--window-size=1920,1080")
+    chrome_opts.add_argument("--disable-gpu")
+    chrome_opts.add_argument("--disable-features=NetworkService")
+    chrome_opts.add_argument("--disable-features=VizDisplayCompositor")
+    chrome_opts.add_argument("--remote-debugging-port=9222")
+
     return webdriver.Chrome(options=chrome_opts)
 
 
@@ -67,6 +77,15 @@ def try_click_js_first(driver, elem):
             return True
         except Exception:
             return False
+
+
+def safe_click_if_present(driver, by, value):
+    try:
+        el = driver.find_element(by, value)
+        try_click_js_first(driver, el)
+        return True
+    except Exception:
+        return False
 
 
 def get_rows_after_load(driver, wait: WebDriverWait):
@@ -88,6 +107,78 @@ def write_header_if_needed(csv_writer, rows, header_written_flag: bool) -> bool:
     return header_written_flag
 
 
+def set_date_value(driver, wait, date_str):
+    """
+    Try multiple strategies to set the date:
+    1) input[type='date'] via send_keys
+    2) input[type='text'] via send_keys
+    3) JS: set 'value' on the first visible input and dispatch events
+    """
+    # wait for any date-like input to exist
+    date_input = wait.until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "input[type='date'], input[type='text']")
+        )
+    )
+
+    # Prefer a visible element
+    inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='date'], input[type='text']")
+    target = None
+    for inp in inputs:
+        if inp.is_displayed() and inp.is_enabled():
+            target = inp
+            break
+    if not target:
+        target = date_input
+
+    try:
+        target.clear()
+        target.send_keys(date_str)
+        return True
+    except Exception:
+        # JS fallback
+        driver.execute_script("""
+            const el = arguments[0];
+            el.value = arguments[1];
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        """, target, date_str)
+        return True
+
+
+def click_search_button(driver, wait):
+    # Button might be in Nepali or English; try a few text patterns.
+    candidates = [
+        "//button[contains(., 'मूल्य')]",
+        "//button[contains(., 'जाँच')]",     # 'check' in Nepali
+        "//button[contains(., 'Price')]",
+        "//button[contains(., 'Check')]",
+        "//button[contains(., 'Search')]",
+        "//button"
+    ]
+    for xp in candidates:
+        try:
+            btn = wait.until(EC.element_to_be_clickable((By.XPATH, xp)))
+            if try_click_js_first(driver, btn):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def dismiss_overlays(driver):
+    # In case there is any cookie/consent overlay
+    # Try common labels (English/Nepali) but ignore if not present
+    common_buttons = [
+        (By.XPATH, "//button[contains(., 'Accept')]"),
+        (By.XPATH, "//button[contains(., 'I agree')]"),
+        (By.XPATH, "//button[contains(., 'स्वीकार')]"),
+        (By.XPATH, "//button[contains(., 'ठिक')]"),
+    ]
+    for by, sel in common_buttons:
+        safe_click_if_present(driver, by, sel)
+
+
 def scrape_today_only():
     ensure_outdir()
     target_dt = today_nepal_date()
@@ -98,33 +189,23 @@ def scrape_today_only():
         return 0
 
     driver = setup_driver()
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 40)
 
     added_rows = 0
     try:
         print(f"[INFO] Fetching {target_date_str} (Nepal time)")
-
         driver.get(URL)
+        dismiss_overlays(driver)
 
-        # Find a date input — the page may use type='text' or 'date'
-        date_input = wait.until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[type='text'], input[type='date']")
-            )
-        )
-        date_input.clear()
-        date_input.send_keys(target_date_str)
+        # Set date
+        set_date_value(driver, wait, target_date_str)
 
-        # Button text commonly contains Nepali 'मूल्य' (price) or English 'Price/Check'
-        btn = wait.until(
-            EC.element_to_be_clickable(
-                (
-                    By.XPATH,
-                    "//button[contains(., 'मूल्य') or contains(., 'Price') or contains(., 'Check')]",
-                )
-            )
-        )
-        try_click_js_first(driver, btn)
+        # Click search/check price
+        if not click_search_button(driver, wait):
+            print("[WARN] Could not find a search/check/price button; attempting Enter key on input.")
+            # Try pressing Enter on the active element
+            driver.switch_to.active_element.send_keys("\n")
+            time.sleep(2)
 
         rows = get_rows_after_load(driver, wait)
 
@@ -155,6 +236,12 @@ def scrape_today_only():
 
     except TimeoutException:
         print(f"[ERROR] Timeout while scraping {target_date_str}")
+        # Helpful debug: dump a small piece of DOM
+        try:
+            html = driver.page_source
+            print(f"[DEBUG] page_source length={len(html)}")
+        except Exception:
+            pass
         return 0
     except Exception as e:
         print(f"[ERROR] {target_date_str}: {e}")
@@ -167,6 +254,6 @@ def scrape_today_only():
 
 
 if __name__ == "__main__":
-    rows = scrape_today_only()
-    # Exit 0 even if zero rows; GitHub Action will still continue to commit if needed.
+    _ = scrape_today_only()
+    # Always exit 0 so the workflow can finish and try commit if any
     sys.exit(0)
