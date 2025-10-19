@@ -3,7 +3,7 @@ name: Scrape Kalimati Prices
 on:
   schedule:
     # Daily 00:02 Bangkok (UTC+7) == 17:02 UTC previous day
-    - cron: "2 17 * * *"
+    - cron: "3 17 * * *"
   workflow_dispatch: {}
 
 permissions:
