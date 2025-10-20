@@ -46,7 +46,7 @@ jobs:
           git config user.name "lamanabin2046"
           git config user.email "lamanabin2046@gmail.com"
           if [[ -n "$(git status --porcelain)" ]]; then
-            git add data/price_list.csv
+            git add data/veg_price_list.csv
             git commit -m "Update Kalimati price data [skip ci]"
             git push
           else
@@ -58,4 +58,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kalimati-price-data
-          path: data/price_list.csv
+          path: data/veg_price_list.csv
