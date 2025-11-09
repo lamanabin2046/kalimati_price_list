@@ -1,30 +1,36 @@
 # =========================================================
-# 🚚 Kalimati Daily Supply Volume Scraper (Enhanced Version)
+# 🚚 Kalimati Daily Supply Volume Scraper (Final Fixed Version)
 # =========================================================
 import csv
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# ---------------------------------------------------------
+# 🌐 URLs and Output Paths
+# ---------------------------------------------------------
 URL = "https://kalimatimarket.gov.np/daily-arrivals"
 OUT_DIR = "data"
 OUT_FILE = os.path.join(OUT_DIR, "supply_volume.csv")
 START_DATE_STR = "01/01/2022"
 
 # ---------------------------------------------------------
-# 🕒 Date utilities
+# 🕒 Date utilities (timezone-safe for GitHub Actions)
 # ---------------------------------------------------------
 def today_nepal_date():
-    now_utc = datetime.now(timezone.utc)
+    """Return today's date in Nepal Time (naive datetime for safe comparisons)."""
+    now_utc = datetime.utcnow()
     nepal_time = now_utc + timedelta(hours=5, minutes=45)
     return nepal_time.replace(hour=0, minute=0, second=0, microsecond=0)
 
-def date_str(dt): return dt.strftime("%m/%d/%Y")
+def date_str(dt):
+    return dt.strftime("%m/%d/%Y")
+
 def parse_date(s):
     try:
         return datetime.strptime(s, "%m/%d/%Y")
@@ -32,9 +38,10 @@ def parse_date(s):
         return None
 
 # ---------------------------------------------------------
-# 📁 CSV utilities
+# 📁 CSV helpers
 # ---------------------------------------------------------
 def latest_date_in_csv(path):
+    """Return the latest date in the CSV file."""
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         return None
     with open(path, encoding="utf-8") as f:
@@ -43,6 +50,7 @@ def latest_date_in_csv(path):
     return max((d for d in dates if d), default=None)
 
 def date_exists(path, d):
+    """Check if a specific date already exists in CSV."""
     if not os.path.exists(path):
         return False
     with open(path, encoding="utf-8") as f:
@@ -52,6 +60,7 @@ def date_exists(path, d):
 # 🧭 Selenium setup
 # ---------------------------------------------------------
 def setup_driver():
+    """Initialize headless Chrome (optimized for GitHub Actions)."""
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -61,9 +70,10 @@ def setup_driver():
     return webdriver.Chrome(options=options)
 
 # ---------------------------------------------------------
-# ⏰ Date setter helper
+# ⏰ Set the date on the Kalimati website
 # ---------------------------------------------------------
 def set_date(driver, date_str):
+    """Try to set the target date in the date input field."""
     try:
         inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='date'], input[type='text']")
         for el in inputs:
@@ -83,12 +93,12 @@ def set_date(driver, date_str):
     return False
 
 # ---------------------------------------------------------
-# 📊 Scrape data for one date
+# 📊 Scrape data for a specific date
 # ---------------------------------------------------------
 def scrape_arrival_for_date(driver, wait, date_str):
     print(f"📅 Scraping arrival data for {date_str} ...")
     driver.get(URL)
-    time.sleep(3)
+    time.sleep(2)
 
     if not set_date(driver, date_str):
         print(f"[WARN] Could not set date {date_str}")
@@ -98,14 +108,14 @@ def scrape_arrival_for_date(driver, wait, date_str):
         btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'आगमन डाटा जाँच्नुहोस्')]")))
         driver.execute_script("arguments[0].click();", btn)
     except Exception:
-        print(f"[WARN] 'Check Arrival Data' button not clickable for {date_str}")
+        print(f"[WARN] Could not click button for {date_str}")
         return 0
 
     try:
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table")))
         time.sleep(2)
     except:
-        print(f"[WARN] Table did not load for {date_str}")
+        print(f"[WARN] Table not found for {date_str}")
         return 0
 
     if "टेबलमा डाटा उपलब्ध भएन" in driver.page_source:
@@ -132,7 +142,7 @@ def scrape_arrival_for_date(driver, wait, date_str):
     return added
 
 # ---------------------------------------------------------
-# 🚀 Main function
+# 🚀 Main entry point
 # ---------------------------------------------------------
 if __name__ == "__main__":
     start = parse_date(START_DATE_STR)
@@ -151,14 +161,11 @@ if __name__ == "__main__":
         while start <= end:
             ds = date_str(start)
             if not date_exists(OUT_FILE, ds):
-                added = scrape_arrival_for_date(driver, wait, ds)
-                total += added
+                total += scrape_arrival_for_date(driver, wait, ds)
             else:
                 print(f"⏩ Skipping existing date: {ds}")
             start += timedelta(days=1)
             time.sleep(1)
-    except KeyboardInterrupt:
-        print("🛑 Interrupted by user.")
     except Exception as e:
         print(f"❌ Error: {e}")
     finally:
