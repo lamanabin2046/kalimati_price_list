@@ -1,8 +1,8 @@
-name: Scrape Kalimati Prices, Arrivals & Weather Data
+name: "Scrape Kalimati Prices and Weather Data"
 
 on:
   schedule:
-    # ⏰ Daily 00:52 Bangkok (UTC+7) == 17:52 UTC previous day
+    # Daily 00:52 Bangkok (UTC+7) == 17:52 UTC previous day
     - cron: "52 0 * * *"
   workflow_dispatch: {}
 
