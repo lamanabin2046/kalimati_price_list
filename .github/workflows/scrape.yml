@@ -20,7 +20,7 @@ jobs:
       - name: ⚙️ Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium requests
+          pip install selenium requests pandas
 
       - name: 🌐 Install Chrome & Driver
         uses: browser-actions/setup-chrome@v1
@@ -31,10 +31,13 @@ jobs:
       - name: 🚚 Scrape Kalimati Arrivals
         run: python scraper_arrival.py
 
+      - name: ☀️ Scrape Weather Data
+        run: python openmeteo_weather.py
+
       - name: 💾 Commit and Push Results
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add data/*.csv
-          git commit -m "🕒 Auto update $(date)"
-          git push
+          git add data/*.csv || true
+          git commit -m "🕒 Auto update $(date)" || echo "No new data to commit"
+          git push || echo "No changes to push"
