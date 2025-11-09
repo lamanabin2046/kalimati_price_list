@@ -11,7 +11,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-
 # =========================================================
 # 🌐 URLs and File Paths
 # =========================================================
@@ -24,7 +23,6 @@ ARRIVAL_FILE = os.path.join(OUT_DIR, "supply_volume.csv")
 
 START_DATE_STR = "01/01/2022"  # mm/dd/YYYY
 
-
 # =========================================================
 # 🕒 Time and Date Utilities
 # =========================================================
@@ -33,10 +31,8 @@ def today_nepal_date():
     npt = datetime.utcnow() + timedelta(hours=5, minutes=45)
     return npt.replace(hour=0, minute=0, second=0, microsecond=0)
 
-
 def date_str_mmddyyyy(dt: datetime) -> str:
     return dt.strftime("%m/%d/%Y")
-
 
 def parse_mmddyyyy(s: str):
     try:
@@ -44,13 +40,11 @@ def parse_mmddyyyy(s: str):
     except Exception:
         return None
 
-
 # =========================================================
 # 📂 File Utilities
 # =========================================================
 def ensure_outdir():
     os.makedirs(OUT_DIR, exist_ok=True)
-
 
 def date_already_recorded(csv_path: str, date_str: str) -> bool:
     """Check if a given date string is already present in the CSV."""
@@ -63,7 +57,6 @@ def date_already_recorded(csv_path: str, date_str: str) -> bool:
             if row[0].strip() == date_str:
                 return True
     return False
-
 
 def latest_date_in_csv(csv_path: str):
     """Return the latest date in a CSV, or None if empty."""
@@ -78,7 +71,6 @@ def latest_date_in_csv(csv_path: str):
             if d and (latest is None or d > latest):
                 latest = d
     return latest
-
 
 # =========================================================
 # 🧭 Selenium Helpers
@@ -99,7 +91,6 @@ def setup_driver():
 
     return webdriver.Chrome(options=chrome_opts)
 
-
 def try_click_js_first(driver, elem):
     try:
         driver.execute_script("arguments[0].click();", elem)
@@ -110,7 +101,6 @@ def try_click_js_first(driver, elem):
             return True
         except Exception:
             return False
-
 
 def dismiss_overlays(driver):
     """Close cookie or modal banners if present."""
@@ -124,7 +114,6 @@ def dismiss_overlays(driver):
             driver.find_element(by, sel).click()
         except Exception:
             continue
-
 
 def set_date_value(driver, wait, date_str):
     """Set the date input field value."""
@@ -148,7 +137,6 @@ def set_date_value(driver, wait, date_str):
             date_str,
         )
 
-
 def click_button(driver, wait, keywords):
     """Try clicking buttons containing any of the given keywords."""
     for kw in keywords:
@@ -160,12 +148,10 @@ def click_button(driver, wait, keywords):
             continue
     return False
 
-
 def get_rows_after_load(driver, wait):
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table")))
     time.sleep(1.2)
     return driver.find_elements(By.CSS_SELECTOR, "table tr")
-
 
 def write_header_if_needed(csv_writer, rows, header_written_flag):
     """Write table header if missing."""
@@ -179,12 +165,11 @@ def write_header_if_needed(csv_writer, rows, header_written_flag):
             return True
     return header_written_flag
 
-
 # =========================================================
 # 🥦 Core Scraping
 # =========================================================
 def scrape_one_date(driver, wait, date_str, url, outfile, button_keywords, retries=3):
-    """Scrape a single page for one date with retry logic."""
+    """Scrape one date and append directly to CSV if data found."""
     for attempt in range(retries):
         try:
             print(f"[INFO] Fetching {date_str} from {url} (Attempt {attempt + 1})", flush=True)
@@ -212,6 +197,7 @@ def scrape_one_date(driver, wait, date_str, url, outfile, button_keywords, retri
                     print(f"[WARN] No data for {date_str}", flush=True)
                     return 0
 
+                # ✅ Append each row immediately to CSV
                 for row in data_rows:
                     w.writerow([date_str] + row)
                     added_rows += 1
@@ -219,18 +205,11 @@ def scrape_one_date(driver, wait, date_str, url, outfile, button_keywords, retri
             print(f"[OK] Added {added_rows} rows for {date_str}", flush=True)
             return added_rows
 
-        except TimeoutException:
-            print(f"[TIMEOUT] Retrying {date_str}...", flush=True)
-            time.sleep(4)
-        except WebDriverException as e:
-            print(f"[ERROR] WebDriver issue on {date_str}: {e}", flush=True)
-            time.sleep(5)
         except Exception as e:
-            print(f"[ERROR] Generic failure on {date_str}: {e}", flush=True)
+            print(f"[ERROR] {type(e).__name__} while fetching {date_str}: {e}", flush=True)
             time.sleep(5)
     print(f"[FAIL] Skipped {date_str} after {retries} attempts.", flush=True)
     return 0
-
 
 # =========================================================
 # 🚀 Main Scraper Logic
@@ -251,36 +230,38 @@ def scrape_range(start_dt, end_dt):
 
         while current <= end_dt:
             date_str = date_str_mmddyyyy(current)
+            print(f"===== 🗓️ {date_str} =====", flush=True)
 
             # ---- Price Data ----
             if not date_already_recorded(PRICE_FILE, date_str):
-                total_price += scrape_one_date(
+                rows_added = scrape_one_date(
                     driver, wait, date_str, PRICE_URL, PRICE_FILE,
                     ["मूल्य", "Price", "Check"]
                 )
+                total_price += rows_added
             else:
                 print(f"[SKIP] Price data for {date_str} already exists", flush=True)
 
             # ---- Arrival Data ----
             if not date_already_recorded(ARRIVAL_FILE, date_str):
-                total_arrivals += scrape_one_date(
+                rows_added = scrape_one_date(
                     driver, wait, date_str, ARRIVAL_URL, ARRIVAL_FILE,
                     ["आगमन", "Arrival", "Check"]
                 )
+                total_arrivals += rows_added
             else:
                 print(f"[SKIP] Arrival data for {date_str} already exists", flush=True)
 
-            # ✅ Log progress
-            print(f"[PROGRESS] {date_str} done → Price: {total_price}, Arrival: {total_arrivals}\n", flush=True)
+            print(f"[PROGRESS] ✅ {date_str} done → Price: {total_price}, Arrival: {total_arrivals}\n", flush=True)
 
             current += timedelta(days=1)
             time.sleep(1.5)
 
-        print(f"[DONE] ✅ Added {total_price} price rows and {total_arrivals} arrival rows.", flush=True)
+        print(f"[DONE] ✅ Completed scraping up to {date_str_mmddyyyy(end_dt)}", flush=True)
+        print(f"📈 Total price rows: {total_price}, Total arrival rows: {total_arrivals}", flush=True)
 
     finally:
         driver.quit()
-
 
 # =========================================================
 # 🏁 Entrypoint
@@ -293,10 +274,11 @@ if __name__ == "__main__":
         print("[FATAL] Invalid start date format.", flush=True)
         sys.exit(1)
 
-    # Resume from latest existing date if available
+    # Resume from last recorded date
     last_price = latest_date_in_csv(PRICE_FILE)
     last_arrival = latest_date_in_csv(ARRIVAL_FILE)
     last_done = max(d for d in [last_price, last_arrival] if d is not None) if (last_price or last_arrival) else None
+
     if last_done and last_done > start:
         start = last_done + timedelta(days=1)
         print(f"⏩ Resuming from next date after {date_str_mmddyyyy(last_done)}", flush=True)
