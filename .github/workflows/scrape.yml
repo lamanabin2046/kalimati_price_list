@@ -1,9 +1,11 @@
 name: "Scrape Kalimati Prices and Weather Data"
 
 on:
+  push:
+    branches: [ main ]        # 👈 triggers when you push to main branch
   schedule:
-    - cron: "52 0 * * *"
-  workflow_dispatch: {}
+    - cron: "52 0 * * *"      # 👈 runs daily at 00:52 Bangkok time
+  workflow_dispatch: {}        # 👈 allows manual "Run workflow" from GitHub UI
 
 permissions:
   contents: write
