@@ -1,5 +1,5 @@
 # =========================================================
-# 🚚 Kalimati Daily Supply Volume Scraper (Final Fixed Version)
+# 🚚 Kalimati Daily Supply Volume Scraper (Auto-Resume Version)
 # =========================================================
 import csv
 import os
@@ -41,20 +41,13 @@ def parse_date(s):
 # 📁 CSV helpers
 # ---------------------------------------------------------
 def latest_date_in_csv(path):
-    """Return the latest date in the CSV file."""
+    """Return the latest date in the CSV file (if exists)."""
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         return None
     with open(path, encoding="utf-8") as f:
-        next(f, None)
+        next(f, None)  # skip header
         dates = [parse_date(row.split(",")[0]) for row in f if row.strip()]
     return max((d for d in dates if d), default=None)
-
-def date_exists(path, d):
-    """Check if a specific date already exists in CSV."""
-    if not os.path.exists(path):
-        return False
-    with open(path, encoding="utf-8") as f:
-        return any(line.startswith(d) for line in f)
 
 # ---------------------------------------------------------
 # 🧭 Selenium setup
@@ -128,10 +121,12 @@ def scrape_arrival_for_date(driver, wait, date_str):
 
     with open(OUT_FILE, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
+        # Write header if file is empty
         if os.path.getsize(OUT_FILE) == 0:
             headers = ["Date"] + [th.text.strip() for th in rows[0].find_elements(By.TAG_NAME, "th")]
             w.writerow(headers)
 
+        # Append new rows
         for row in rows[1:]:
             cols = [td.text.strip() for td in row.find_elements(By.TAG_NAME, "td")]
             if cols:
@@ -145,14 +140,26 @@ def scrape_arrival_for_date(driver, wait, date_str):
 # 🚀 Main entry point
 # ---------------------------------------------------------
 if __name__ == "__main__":
+    # Base date (start of dataset)
     start = parse_date(START_DATE_STR)
+
+    # Today's date (Nepal)
     end = today_nepal_date()
+
+    # Find last recorded date in CSV (if any)
     last_date = latest_date_in_csv(OUT_FILE)
 
-    if last_date and last_date > start:
+    # Resume logic
+    if last_date:
+        if last_date >= end:
+            print(f"🟢 Data already up-to-date. Last entry: {date_str(last_date)}")
+            exit()
         print(f"⏩ Resuming from {date_str(last_date)}")
         start = last_date + timedelta(days=1)
+    else:
+        print("📄 No previous data found. Starting fresh.")
 
+    # Start scraping
     driver = setup_driver()
     wait = WebDriverWait(driver, 25)
     total = 0
@@ -160,10 +167,7 @@ if __name__ == "__main__":
     try:
         while start <= end:
             ds = date_str(start)
-            if not date_exists(OUT_FILE, ds):
-                total += scrape_arrival_for_date(driver, wait, ds)
-            else:
-                print(f"⏩ Skipping existing date: {ds}")
+            total += scrape_arrival_for_date(driver, wait, ds)
             start += timedelta(days=1)
             time.sleep(1)
     except Exception as e:

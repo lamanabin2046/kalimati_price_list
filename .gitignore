@@ -34,5 +34,4 @@ dist/
 .DS_Store
 Thumbs.db
 
-# 🧮 Data outputs
-data/*.csv
+
