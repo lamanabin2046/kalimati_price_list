@@ -1,2 +1,7 @@
 selenium==4.24.0
 pandas==2.2.3   
+selenium
+requests-cache
+retry-requests
+openmeteo-requests
+pandas
