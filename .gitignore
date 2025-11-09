@@ -1,0 +1,38 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.log
+*.sqlite3
+
+# 🧰 Virtual Environment
+venv/
+env/
+.venv/
+ENV/
+
+# 📦 Package and build files
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# 🧪 Jupyter / Cache
+.ipynb_checkpoints
+.pytest_cache/
+.cache/
+
+# ⚙️ IDE / Editor files
+.vscode/
+.idea/
+*.swp
+
+# 🌍 OS Files
+.DS_Store
+Thumbs.db
+
+# 🧮 Data outputs
+data/*.csv
