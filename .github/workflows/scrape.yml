@@ -2,29 +2,45 @@ name: "🕒 Kalimati Daily Scraper"
 
 on:
   schedule:
-    - cron: "0 1 * * *"  # ⏰ Runs every day at 06:45 AM Nepal Time
-  workflow_dispatch:      # 🧭 Allow manual trigger
+    - cron: "15 1 * * *"  # 🕕 Runs daily at 6:00 AM Nepal Time (1:15 UTC)
+  workflow_dispatch:       # 🧭 Allow manual trigger from GitHub Actions tab
 
 jobs:
   run-scrapers:
     runs-on: ubuntu-latest
+
     steps:
+      # ---------------------------
+      # ✅ Step 1: Checkout repository
+      # ---------------------------
       - name: 🛠️ Checkout repo
         uses: actions/checkout@v3
 
+      # ---------------------------
+      # ✅ Step 2: Setup Python
+      # ---------------------------
       - name: 🐍 Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # ---------------------------
+      # ✅ Step 3: Install dependencies
+      # ---------------------------
       - name: ⚙️ Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install selenium requests pandas
 
+      # ---------------------------
+      # ✅ Step 4: Install Chrome & Driver
+      # ---------------------------
       - name: 🌐 Install Chrome & Driver
         uses: browser-actions/setup-chrome@v1
 
+      # ---------------------------
+      # ✅ Step 5: Run all scrapers sequentially
+      # ---------------------------
       - name: 💰 Scrape Kalimati Prices
         run: python scraper_price.py
 
@@ -32,12 +48,22 @@ jobs:
         run: python scraper_arrival.py
 
       - name: ☀️ Scrape Weather Data
-        run: python openmeteo_weather.py
+        run: python weather.py       # ✅ updated filename here
 
+      # ---------------------------
+      # ✅ Step 6: Commit and Push Results
+      # ---------------------------
       - name: 💾 Commit and Push Results
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add data/*.csv || true
-          git commit -m "🕒 Auto update $(date)" || echo "No new data to commit"
-          git push || echo "No changes to push"
+
+          # Commit only if there are changes
+          if git diff --cached --quiet; then
+            echo "✅ No new data to commit."
+          else
+            git commit -m "🕒 Auto update $(date)"
+            git push
+            echo "✅ Data updated and pushed successfully."
+          fi
