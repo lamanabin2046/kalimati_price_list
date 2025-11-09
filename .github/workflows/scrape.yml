@@ -2,9 +2,8 @@ name: "Scrape Kalimati Prices and Weather Data"
 
 on:
   schedule:
-    # Daily 00:52 Bangkok (UTC+7) == 17:52 UTC previous day
     - cron: "52 0 * * *"
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -12,65 +11,37 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # prevent hanging forever
+    timeout-minutes: 30
 
     steps:
-      # ---------------------------------------------------
-      # 🧩 Checkout your repository
-      # ---------------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
 
-      # ---------------------------------------------------
-      # 🐍 Setup Python Environment
-      # ---------------------------------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ---------------------------------------------------
-      # 🌐 Setup Chrome for Selenium
-      # ---------------------------------------------------
       - name: Install Google Chrome
         uses: browser-actions/setup-chrome@v1
 
-      - name: Show Chrome Path
-        run: echo "Chrome path is $CHROME_PATH"
-
-      # ---------------------------------------------------
-      # 📦 Install Dependencies
-      # ---------------------------------------------------
-      - name: Install Python Dependencies
+      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install -U pip
           pip install -r requirements.txt
 
-      # ---------------------------------------------------
-      # 🥦 Run Kalimati Market Scraper (Price + Arrivals)
-      # ---------------------------------------------------
       - name: Run Kalimati Scraper
         env:
           CHROME_PATH: ${{ env.CHROME_PATH }}
         run: python scraper.py
 
-      # ---------------------------------------------------
-      # 🌦 Run Open-Meteo Weather Fetcher
-      # ---------------------------------------------------
       - name: Run Weather Data Fetcher
         run: python openmeteo_weather.py
 
-      # ---------------------------------------------------
-      # 💾 Commit & Push Updated Data
-      # ---------------------------------------------------
       - name: Commit and Push Updated Data
         run: |
           git config user.name "lamanabin2046"
           git config user.email "lamanabin2046@gmail.com"
-
-          # Only commit if there are changes
           if [[ -n "$(git status --porcelain)" ]]; then
             git add data/
             git commit -m "Update Kalimati Market and Weather data [skip ci]"
@@ -79,9 +50,6 @@ jobs:
             echo "✅ No data changes to commit."
           fi
 
-      # ---------------------------------------------------
-      # 📤 Upload Data Artifacts (Optional)
-      # ---------------------------------------------------
       - name: Upload CSV Artifacts
         if: always()
         uses: actions/upload-artifact@v4
