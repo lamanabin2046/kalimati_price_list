@@ -4,19 +4,16 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: "52 0 * * *"     # Runs daily at 00:52 Bangkok time
+    - cron: "52 0 * * *"     # runs daily at 00:52 Bangkok time
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  # ==========================================
-  # 🥬 JOB 1 — Scrape Kalimati Market Data
-  # ==========================================
-  scrape-market:
+  scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 120     # allow up to 2 hours for scraping
 
     steps:
       - name: 🧾 Checkout Repository
@@ -35,62 +32,12 @@ jobs:
           python -m pip install -U pip
           pip install -r requirements.txt
 
-      - name: 🍅 Run Price Scraper
+      - name: 🧺 Run Kalimati Scraper
         env:
           CHROME_PATH: ${{ env.CHROME_PATH }}
         run: |
-          echo "🚀 Starting Kalimati Price Scraper..."
-          python scraper_price.py
-          echo "✅ Price scraping completed!"
-
-      - name: 📦 Run Supply Volume Scraper
-        run: |
-          echo "🚀 Starting Kalimati Supply Scraper..."
-          python scraper_supply.py
-          echo "✅ Supply scraping completed!"
-
-      - name: 💾 Commit Market Data
-        run: |
-          git config user.name "lamanabin2046"
-          git config user.email "lamanabin2046@gmail.com"
-          if [[ -n "$(git status --porcelain data/)" ]]; then
-            git add data/
-            git commit -m "Update Kalimati Market data [skip ci]"
-            git push
-          else
-            echo "✅ No market data changes to commit."
-          fi
-
-      - name: 📤 Upload Market Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kalimati-market-data
-          path: |
-            data/veg_price_list_2021.csv
-            data/supply_volume.csv
-
-  # ==========================================
-  # 🌤️ JOB 2 — Fetch Weather Data
-  # ==========================================
-  scrape-weather:
-    runs-on: ubuntu-latest
-    needs: scrape-market      # only runs after market job completes
-    timeout-minutes: 45
-
-    steps:
-      - name: 🧾 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install -U pip
-          pip install -r requirements.txt
+          echo "🚀 Starting Kalimati Scraper..."
+          python scraper.py     # ✅ correct file name here!
 
       - name: 🌦️ Run Weather Data Fetcher
         run: |
@@ -98,21 +45,24 @@ jobs:
           python openmeteo_weather.py
           echo "✅ Weather data fetched successfully!"
 
-      - name: 💾 Commit Weather Data
+      - name: 💾 Commit and Push Updated Data
         run: |
           git config user.name "lamanabin2046"
           git config user.email "lamanabin2046@gmail.com"
           if [[ -n "$(git status --porcelain data/)" ]]; then
             git add data/
-            git commit -m "Update Weather Data [skip ci]"
+            git commit -m "Update Kalimati Market and Weather data [skip ci]"
             git push
           else
-            echo "✅ No weather data changes to commit."
+            echo "✅ No new data to commit."
           fi
 
-      - name: 📤 Upload Weather Artifacts
+      - name: 📤 Upload CSV Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weather-daily-data
-          path: data/nepal_weather_daily_avg.csv
+          name: daily-datasets
+          path: |
+            data/veg_price_list.csv
+            data/supply_volume.csv
+            data/nepal_weather_daily_avg.csv
