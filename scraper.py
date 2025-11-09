@@ -20,10 +20,10 @@ PRICE_URL = "https://kalimatimarket.gov.np/price"
 ARRIVAL_URL = "https://kalimatimarket.gov.np/daily-arrivals"
 
 OUT_DIR = "data"
-PRICE_FILE = os.path.join(OUT_DIR, "veg_price_list_2021.csv")
-ARRIVAL_FILE = os.path.join(OUT_DIR, "supply_volume.csv")
+PRICE_FILE = os.path.join(OUT_DIR, "veg_price_list.csv")   # ✅ existing file
+ARRIVAL_FILE = os.path.join(OUT_DIR, "supply_volume.csv")  # ✅ new file
 
-START_DATE_STR = "01/01/2022"  # mm/dd/YYYY format
+START_DATE_STR = "01/01/2022"  # mm/dd/YYYY
 
 
 # =========================================================
@@ -109,7 +109,6 @@ def setup_driver():
 
 
 def try_click_js_first(driver, elem):
-    """Attempt JS-based click first for better compatibility."""
     try:
         driver.execute_script("arguments[0].click();", elem)
         return True
@@ -122,12 +121,11 @@ def try_click_js_first(driver, elem):
 
 
 def dismiss_overlays(driver):
-    """Close popups or cookie banners if they appear."""
+    """Close cookie banners if present."""
     candidates = [
         (By.XPATH, "//button[contains(., 'Accept')]"),
-        (By.XPATH, "//button[contains(., 'I agree')]"),
-        (By.XPATH, "//button[contains(., 'स्वीकार')]"),
         (By.XPATH, "//button[contains(., 'ठिक')]"),
+        (By.XPATH, "//button[contains(., 'स्वीकार')]"),
     ]
     for by, sel in candidates:
         try:
@@ -137,7 +135,7 @@ def dismiss_overlays(driver):
 
 
 def set_date_value(driver, wait, date_str):
-    """Select the desired date on the input field."""
+    """Select the desired date."""
     date_input = wait.until(
         EC.presence_of_element_located(
             (By.CSS_SELECTOR, "input[type='date'], input[type='text']")
@@ -164,7 +162,7 @@ def set_date_value(driver, wait, date_str):
 
 
 def click_button(driver, wait, keywords):
-    """Click button by searching possible text keywords."""
+    """Try clicking buttons containing any of the given keywords."""
     for kw in keywords:
         xp = f"//button[contains(., '{kw}')]"
         try:
