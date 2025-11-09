@@ -1,59 +1,36 @@
-# openmeteo_weather.py
-import openmeteo_requests
+# 🌦️ openmeteo_weather.py
+import requests
 import pandas as pd
-import requests_cache
-from retry_requests import retry
-from datetime import date
+import os
+from datetime import datetime, timezone, timedelta
 
-cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
-retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
-openmeteo = openmeteo_requests.Client(session=retry_session)
+URL = "https://api.open-meteo.com/v1/forecast"
+OUT_DIR = "data"
+OUT_FILE = os.path.join(OUT_DIR, "weather.csv")
 
-districts = {
-    "Kathmandu": {"latitude": 27.7172, "longitude": 85.3240},
-    "Dhading": {"latitude": 27.9100, "longitude": 84.9000},
-    "Kavre": {"latitude": 27.6000, "longitude": 85.5500},
-    "Sarlahi": {"latitude": 26.9830, "longitude": 85.5500}
-}
+def today_nepal_date():
+    now_utc = datetime.now(timezone.utc)
+    return (now_utc + timedelta(hours=5, minutes=45)).date()
 
-url = "https://archive-api.open-meteo.com/v1/archive"
-start_date = "2022-01-01"
-end_date = str(date.today())
-
-weather_vars = ["temperature_2m", "relative_humidity_2m", "precipitation", "rain", "pressure_msl", "wind_speed_10m"]
-
-all_data = []
-for district, coords in districts.items():
-    print(f"Fetching {district}...")
+def fetch_weather():
     params = {
-        "latitude": coords["latitude"],
-        "longitude": coords["longitude"],
-        "start_date": start_date,
-        "end_date": end_date,
-        "hourly": weather_vars,
+        "latitude": 27.7172,
+        "longitude": 85.3240,
+        "daily": ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
         "timezone": "Asia/Kathmandu"
     }
-    responses = openmeteo.weather_api(url, params=params)
-    response = responses[0]
-    hourly = response.Hourly()
-    hourly_data = {
-        "Date": pd.date_range(
-            start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
-            end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
-            freq=pd.Timedelta(seconds=hourly.Interval()),
-            inclusive="left"
-        )
-    }
-    for i, var in enumerate(weather_vars):
-        hourly_data[f"{district}_{var}"] = hourly.Variables(i).ValuesAsNumpy()
-    df = pd.DataFrame(hourly_data)
-    all_data.append(df)
+    r = requests.get(URL, params=params)
+    r.raise_for_status()
+    data = r.json()
+    df = pd.DataFrame(data["daily"])
+    df["date"] = pd.to_datetime(df["time"])
+    return df[["date", "temperature_2m_max", "temperature_2m_min", "precipitation_sum"]]
 
-final_df = all_data[0]
-for df in all_data[1:]:
-    final_df = pd.merge(final_df, df, on="Date", how="outer")
-
-final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.date
-daily_avg_df = final_df.groupby("Date").mean(numeric_only=True).reset_index()
-daily_avg_df.to_csv("data/nepal_weather_daily_avg.csv", index=False)
-print("✅ Updated weather data saved.")
+if __name__ == "__main__":
+    os.makedirs(OUT_DIR, exist_ok=True)
+    df = fetch_weather()
+    if os.path.exists(OUT_FILE):
+        old = pd.read_csv(OUT_FILE)
+        df = pd.concat([old, df]).drop_duplicates(subset=["date"]).sort_values("date")
+    df.to_csv(OUT_FILE, index=False)
+    print(f"✅ Weather updated → {OUT_FILE}")
