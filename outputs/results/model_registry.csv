@@ -1,0 +1,11 @@
+Date,Model,MAE,R2,Model_Path,Predictions_Path
+2025-11-10,random_forest,3.871,0.889,outputs/models/random_forest_2025-11-10.joblib,outputs/results/predictions_random_forest_2025-11-10.csv
+2025-11-10,gradient_boost,4.271,0.867,outputs/models/gradient_boost_2025-11-10.joblib,outputs/results/predictions_gradient_boost_2025-11-10.csv
+2025-11-10,random_forest,3.871,0.889,outputs/models/random_forest_2025-11-10.joblib,outputs/results/predictions_random_forest_2025-11-10.csv
+2025-11-10,gradient_boost,4.271,0.867,outputs/models/gradient_boost_2025-11-10.joblib,outputs/results/predictions_gradient_boost_2025-11-10.csv
+2025-11-10,random_forest,3.871,0.889,outputs/models/random_forest_2025-11-10.joblib,outputs/results/predictions_random_forest_2025-11-10.csv
+2025-11-10,gradient_boost,4.271,0.867,outputs/models/gradient_boost_2025-11-10.joblib,outputs/results/predictions_gradient_boost_2025-11-10.csv
+2025-11-10,random_forest,3.871,0.889,outputs/models/random_forest_2025-11-10.joblib,outputs/results/predictions_random_forest_2025-11-10.csv
+2025-11-10,gradient_boost,4.271,0.867,outputs/models/gradient_boost_2025-11-10.joblib,outputs/results/predictions_gradient_boost_2025-11-10.csv
+2025-11-10,random_forest,3.871,0.889,outputs/models/random_forest_2025-11-10.joblib,outputs/results/predictions_random_forest_2025-11-10.csv
+2025-11-10,gradient_boost,4.271,0.867,outputs/models/gradient_boost_2025-11-10.joblib,outputs/results/predictions_gradient_boost_2025-11-10.csv
